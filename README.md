@@ -54,7 +54,7 @@ uv run python tactile_bench/data/collect.py
 
 ```
 
-2. (Optionally) process that tactile data to extract markers and save as a graph
+2. (Optionally) process that tactile data to binary images
 ```sh
 uv run python tactile_bench/data/process.py
 ```
