@@ -1,0 +1,16 @@
+# @package _global_
+# Runtime options for the collect script
+
+defaults:
+  - /runtime/base
+  - /collect: edge_xRz_mg400 
+  - /sensor: simtip_dome # tactip_dome127 # 
+  - _self_
+
+collect:
+  data_dirs: [train, val]  
+  sample_nums: [800, 200] 
+  experiment: ${sensor.name}/${collect.name}
+
+  # WARNING! make sure settings agree with source data
+  # transfer: tactile_data/tactip/edge_xRz

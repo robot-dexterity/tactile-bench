@@ -1,0 +1,8 @@
+name: simtip
+crop: [12, 12, 240, 240]  
+
+sim: 
+  sensor_type: standard_tactip
+  image_size: [256, 256]
+  turn_off_border: false
+  show_tactile: true
