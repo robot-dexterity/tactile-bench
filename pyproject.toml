@@ -22,6 +22,7 @@ dependencies = [
     "scikit-image>=0.19.3",
     "seaborn",
     "transforms3d",
+    "tqdm",
     "common-robot-interface[sim]",
     "tactile-sim"
 ]
