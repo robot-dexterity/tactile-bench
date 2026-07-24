@@ -6,18 +6,20 @@ import hydra
 import numpy as np
 import os
 import pandas as pd
+import shutil
 import yaml
 from omegaconf import DictConfig, OmegaConf
-from shutil import copy, copytree, rmtree
+from shutil import rmtree
 from tqdm import tqdm
 
-from tactile_bench.data.utils import transform_image
+from tactile_bench.data.utils import image_transforms
 import shutil
 
 
-def process_images(save_dir: str, process_images: DictConfig, 
-                   globals: DictConfig) -> None:
-    """Process images in given directory, applying transformations and saving processed images."""
+def process_images(
+    save_dir: str, images_cfg: DictConfig, globals: DictConfig
+) -> None:
+    """Process images in given directory, transforming and saving them."""
 
     print(f"Processing images and targets in {save_dir}...")
     targets_df = pd.read_csv(f"{save_dir}/targets.csv")
@@ -32,59 +34,53 @@ def process_images(save_dir: str, process_images: DictConfig,
             continue
 
         img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-        img_new = transform_image.transform_image(img, **process_images)
+        img_new = image_transforms.apply(img, **images_cfg)
         cv2.imwrite(img_path, img_new)
 
-        if process_images.get("visualise_on", False):
+        if images_cfg.get("visualise_on", False):
             scale = img_new.shape[0] / img.shape[0]
-            img = cv2.resize(
-                img, (int(img.shape[1] * scale), img_new.shape[0]))
+            img = cv2.resize(img, (int(img.shape[1] * scale), img_new.shape[0]))
             cv2.imshow("Processed Images", cv2.hconcat([img, img_new]))
             cv2.waitKey(1)
 
-    # params = yaml.safe_load(open(f"{save_dir}/parameters.yaml", "r"))
-    # params["sensor"]["process"] = process_images
-    # yaml.safe_dump(params, open(f"{save_dir}/parameters.yaml", "w"),
-    #                default_flow_style=None)
     targets_df.to_csv(f"{save_dir}/targets.csv", index=False)
     cv2.destroyAllWindows()
 
 
 def partition_data(save_dir: str, cfg: DictConfig) -> list[str]:
-    """Partition data into two e.g. train/val, copying parameters accordingly."""
+    """Partition data while including reference rows in every output."""
 
-    np.random.seed(cfg.settings.seed)  # repeatable partitions
-    img_id, ref_id = cfg.globals.IMAGE, cfg.globals.REFERENCE, 
-    base_dir = os.path.basename(save_dir)
-    targets_df = pd.read_csv(f"{save_dir}/targets.csv")
+    targets = pd.read_csv(f"{save_dir}/targets.csv")
+    markers = pd.read_csv(f"{save_dir}/markers.zip", compression="zip") \
+                if os.path.isfile(f"{save_dir}/markers.zip") else None
+    dirs = [f"{os.path.dirname(save_dir)}/{p}" for p in cfg.collect.partition_dirs]
+    ratios = np.asarray(cfg.collect.get("partition_ratios", [1 - 0.2 * (len(dirs) - 1)] 
+                                        + [0.2] * (len(dirs) - 1)), float)
+    ratios = np.r_[ratios, 1 - ratios.sum()] \
+                if len(ratios) == len(dirs) - 1 else ratios
+    if len(ratios) != len(dirs) or np.any(ratios < 0) or ratios.sum() <= 0:
+        raise ValueError("Invalid collect.partition_ratios")
+    ratios /= ratios.sum()
 
-    # set output directories and partition indices
-    out_dirs = [f"{os.path.dirname(save_dir)}/{p}" for p in cfg.collect.partition_dirs]
-    n = len(out_dirs) - 1
-    ratios = cfg.collect.get("partition_ratios", [1 - 0.2 * n] + n * [0.2])  # default 80/20 split
+    is_ref = targets[cfg.globals.IMAGE].str.contains(f"(?:^|/){cfg.globals.REFERENCE}\\.png$") \
+                if cfg.globals.REFERENCE is not None else np.zeros(len(targets), bool)
+    refs = np.flatnonzero(is_ref)
+    data = np.random.default_rng(cfg.settings.seed).permutation(np.flatnonzero(~is_ref))
+    parts = np.split(data, (np.cumsum(ratios[:-1]) * len(data)).astype(int))
 
-    if len(ratios) == len(out_dirs):
-        split_points = np.cumsum(np.asarray(ratios[:-1]) / sum(ratios))
-    elif len(ratios) == len(out_dirs) - 1:
-        split_points = np.cumsum(ratios)
-    else:
-        raise ValueError("collect.partition_ratios must be same length as collect.partition_dirs or one fewer")
-
-    num = len(targets_df)
-    split_indices = np.clip(np.floor(split_points * num).astype(int), 0, num)
-    inds = np.split(np.random.permutation(num), split_indices.tolist())
-
-    ind_ref = np.where(targets_df[img_id].str.contains(f"(^|/){ref_id}\\.png$"))[0]
-
-    for out_dir, ind in zip(out_dirs, inds):
+    for out_dir, ids in zip(dirs, parts):
         setup_save_dir(out_dir, cfg)
-        # copy(f"{save_dir}/parameters.yaml", f"{out_dir}/parameters.yaml")
+        ids = np.sort(np.r_[refs, ids])
+        part = targets.iloc[ids].copy()
+        images = part[cfg.globals.IMAGE].copy()
+        part[cfg.globals.IMAGE] = f"../{os.path.basename(save_dir)}/" + part[cfg.globals.IMAGE]
+        part.to_csv(f"{out_dir}/targets.csv", index=False)
 
-        partition_df = targets_df.iloc[np.unique(np.r_[ind_ref, ind])].copy()
-        partition_df[img_id] = f"../{base_dir}/" + partition_df[img_id]
-        partition_df.to_csv(f"{out_dir}/targets.csv", index=False)
+        if markers is not None:
+            markers[markers[cfg.globals.IMAGE].isin(images)].to_csv(
+                f"{out_dir}/markers.zip", index=False, compression={"method": "zip", "archive_name": "markers.csv"})
 
-    return out_dirs
+    return dirs
 
 
 def setup_save_dir(save_dir: str, cfg: DictConfig, sub_dirs: list[str] = []) -> None:
@@ -107,6 +103,7 @@ def setup_save_dir(save_dir: str, cfg: DictConfig, sub_dirs: list[str] = []) -> 
 
 def backup_data(save_dir: str, cfg, data_type: str = None) -> None:
     """Check if backup already exists. If it doesn't, make a backup."""
+
     image_dir, target_file = f"{save_dir}/{cfg.globals.IMAGE}", f"{save_dir}/targets"
     if data_type == "images":
         if not os.path.isfile(f"{image_dir}_bak.zip"):
@@ -117,11 +114,9 @@ def backup_data(save_dir: str, cfg, data_type: str = None) -> None:
             shutil.unpack_archive(f"{image_dir}_bak.zip", image_dir)
         if not os.path.isfile(f"{target_file}_bak.zip"):
             print(f"Backing up original targets in {target_file}_bak.zip")
-            # copy(f"{target_file}.zip", f"{target_file}_bak.zip")
             shutil.make_archive(f"{target_file}_bak", 'zip', f"{save_dir}", "targets.csv")
         elif cfg.settings.restore_on:
             print(f"Restoring original targets from {target_file}_bak.zip")
-            # copy(f"{target_file}_bak.zip", f"{target_file}.zip")
             shutil.unpack_archive(f"{target_file}_bak.zip", f"{save_dir}")
 
 
@@ -134,9 +129,9 @@ def main(cfg: DictConfig):
     for dir in cfg.collect.data_dirs:
         save_dir = f"{cfg.settings.path}/{cfg.collect.experiment}/{dir}"
 
-        if cfg.sensor.get("process_images", False):
+        if cfg.sensor.get("images", False):
             backup_data(save_dir, cfg, "images")
-            process_images(save_dir, cfg.sensor.process_images, cfg.globals)
+            process_images(save_dir, cfg.sensor.images, cfg.globals)
 
         if cfg.collect.get("partition_dirs", False):
             partition_data(save_dir, cfg)

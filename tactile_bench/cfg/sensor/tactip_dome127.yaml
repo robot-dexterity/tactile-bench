@@ -4,7 +4,8 @@ exposure: -7
 greyscale_on: true
 crop: [320, 265, 180]
 
-process_markers:
+markers:
   num_markers: 127
   num_rings: 7
-  detector_type: SkDog
+  pattern: hexagonal
+  backbone_offset_deg: 30

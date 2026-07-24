@@ -7,30 +7,64 @@ from skimage.util import random_noise
 from scipy import ndimage
 
 
-def transform_image(image, grayscale_on=True, crop=None, dims=None, stdiz=False,
-                    normlz=False, binary_threshold=None, circle_mask_radius=None,
-                    circle_mask_offset=None, **kwargs):
+def apply(image, channel_mode=None, crop=None, dims=None, stdiz=False,
+          normlz=False, binary_threshold=None, circle_mask_radius=None,
+          blur_ksize=1, morphology_ksize=1,
+          circle_mask_offset=None, **kwargs):
     """ Transform image in various ways. """
 
-    if grayscale_on and image.ndim == 3 and image.shape[2] == 3:
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)[..., np.newaxis]
+    if channel_mode:
+        if channel_mode == "gray":
+            if image.ndim == 3 and image.shape[2] == 3:
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)[..., np.newaxis]
+            elif image.ndim == 2:
+                image = image[..., np.newaxis]
+        elif channel_mode in ["red", "green", "blue"]:
+            channel_map = {"blue": 0, "green": 1, "red": 2}
+            channel_idx = channel_map[channel_mode]
+            image = image[:, :, channel_idx][..., np.newaxis]
 
     if crop:
+        h, w = image.shape[:2]
         if len(crop) == 4:  # rectangular crop
             x0, y0, x1, y1 = crop
-        elif len(crop) == 3:  # square crop
+            x0, y0 = max(0, x0), max(0, y0)
+            x1, y1 = min(w, x1), min(h, y1)
+            image = image[y0:y1, x0:x1]
+
+        elif len(crop) == 3:  # square crop with padding
             cx, cy, r = crop
             x0, x1 = cx - r, cx + r
             y0, y1 = cy - r, cy + r
-        image = image[y0:y1, x0:x1]
+            size = x1 - x0  # = 2 * r
+
+            src_x0, src_x1 = max(0, x0), min(w, x1)
+            src_y0, src_y1 = max(0, y0), min(h, y1)
+
+            dst_x0 = src_x0 - x0
+            dst_y0 = src_y0 - y0
+
+            canvas = np.zeros((size, size, image.shape[2]), dtype=image.dtype)
+            canvas[dst_y0:dst_y0 + (src_y1 - src_y0),
+                dst_x0:dst_x0 + (src_x1 - src_x0)] = image[src_y0:src_y1, src_x0:src_x1]
+            image = canvas
 
     if dims:
         image = cv2.resize(image, tuple(dims), interpolation=cv2.INTER_AREA)
         if image.ndim < 3:
             image = image[..., np.newaxis]
 
+    if blur_ksize:
+        if blur_ksize > 1:
+            image = cv2.GaussianBlur(image, (blur_ksize, blur_ksize), 0)
+
     if binary_threshold:
         image = threshold_image(image, *binary_threshold)[..., np.newaxis]
+
+    if morphology_ksize:
+        if morphology_ksize > 1:
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (morphology_ksize, morphology_ksize))
+            image = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
 
     if stdiz:
         image = per_image_standardisation(image.astype(np.float32))
@@ -39,10 +73,10 @@ def transform_image(image, grayscale_on=True, crop=None, dims=None, stdiz=False,
         image = image.astype(np.float32) / 255.0
 
     if circle_mask_radius:
-            if not circle_mask_offset:
-                circle_mask_offset = (0, 0)
-            image = apply_circle_mask(
-                image, circle_mask_radius, circle_mask_offset)
+        if not circle_mask_offset:
+            circle_mask_offset = (0, 0)
+        image = apply_circle_mask(
+            image, circle_mask_radius, circle_mask_offset)
 
     return image
 
@@ -191,6 +225,12 @@ def apply_affine_transform(x, theta=0, tx=0, ty=0, zx=1, zy=1, fill_mode='neares
         x = np.stack(channel_images, axis=0)
     return np.rollaxis(x, 0, 3)
 
+def rotate_image(image, angle_deg):
+    h, w = image.shape[:2]
+    center = (w / 2, h / 2)
+    M = cv2.getRotationMatrix2D(center, angle_deg, 1.0)
+    return cv2.warpAffine(image, M, (h, w))
+
 
 def transform_matrix_offset_center(matrix, x, y):
     o_x, o_y = float(x) / 2 + 0.5, float(y) / 2 + 0.5
@@ -224,7 +264,7 @@ def camera_loop(camera,
 
     while True:
         image = camera.process()
-        processed_image = transform_image(image, **image_processing_kwargs)
+        processed_image = apply(image, **image_processing_kwargs)
         cv2.imshow(display_name, processed_image)
         if cv2.waitKey(10) == 27:  # Esc key to stop
             break
@@ -239,7 +279,7 @@ if __name__ == '__main__':
     camera = RealSensor(sensor_params)
 
     image_processing_params = {
-        'grayscale_on': False, 'bbox': None, 'dims': None, 'stdiz': False,
+        'channel_mode': 'gray', 'bbox': None, 'dims': None, 'stdiz': False,
         'normlz': False, 'thresh': [11, -30], 'circle_mask_radius': None}
 
     camera_loop(camera, image_processing_params)

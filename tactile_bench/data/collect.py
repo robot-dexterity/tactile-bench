@@ -14,7 +14,7 @@ from cri.sim.sim_controller import SimController
 from tactile_sim.pybullet_env import pybullet_env
 
 from tactile_bench.data import process
-from tactile_bench.data.utils.sensors import RealSensor, SimSensor
+from tactile_bench.data.utils.sensors import RealSensor, SimSensor, ReplaySensor
 from tactile_bench.data.utils import utils
 
 np.set_printoptions(precision=2, suppress=True)
@@ -131,28 +131,35 @@ def sample_poses(
     return np.array(samples).T + poses_mid
 
 
+def setup_embodiment(cfg: DictConfig) -> tuple[SyncRobot, object]:
+    """Create and configure the robot and tactile sensor."""
+    if cfg.sensor.get("sim", None):
+        env = pybullet_env(**{**cfg.collect.sim, **cfg.sensor.sim})
+        robot = SyncRobot(SimController(env.arm))
+        robot.coord_frame = cfg.collect.sim.work_frame
+        robot.tcp = cfg.collect.sim.tcp_pose
+        sensor = SimSensor(cfg.sensor.sim, env)
+    else:
+        robot = SyncRobot(Controller[cfg.collect.robot]())
+        robot.coord_frame = cfg.collect.real.work_frame
+        robot.tcp = cfg.collect.real.tcp_pose
+        robot.speed = cfg.collect.real.get("speed", 10)
+        sensor = RealSensor(cfg.sensor)
+    if cfg.sensor.get("replay", None):
+        sensor = ReplaySensor(cfg.sensor)
+
+    robot.name, sensor.name = cfg.collect.robot, cfg.sensor.name
+    return robot, sensor
+
+
 def collect_data(save_dir: str, sample_num: int, cfg: DictConfig) -> None:
     """ Collect data for the requested robot/sensor, save data in specified directory. """
 
     np.random.seed(cfg.settings.get('seed', None))
+    
     process.setup_save_dir(save_dir, cfg, sub_dirs=cfg.globals.IMAGE)
-
-    if cfg.sensor.get('sim', None): # sim robot
-        env = pybullet_env(**{**cfg.collect.sim, **cfg.sensor.sim})
-        robot = SyncRobot(SimController(env.arm))
-        sensor = SimSensor(cfg.sensor.sim, env)
-        robot.coord_frame = cfg.collect.sim.work_frame
-        robot.tcp = cfg.collect.sim.tcp_pose 
-
-    else: # real robot
-        robot  = SyncRobot(Controller[cfg.collect.robot]())
-        sensor = RealSensor(cfg.sensor) 
-        robot.coord_frame = cfg.collect.real.work_frame
-        robot.tcp = cfg.collect.real.tcp_pose    
-        robot.speed = cfg.collect.real.get('speed', 10)
- 
+    robot, sensor = setup_embodiment(cfg)
     targets_df = setup_targets(sample_num, cfg.collect, cfg.globals, save_dir)
-
     run_collect_loop(robot, sensor, targets_df, save_dir, cfg.globals, 
                      cfg.collect.get("sort_on", False))
 
@@ -170,10 +177,9 @@ def main(cfg: DictConfig):
         save_dir = f"{cfg.settings.path}/{cfg.collect.experiment}/{dir}"
         collect_data(save_dir, sample_num, cfg)
 
-        if cfg.sensor.get("process_images", False):
+        if cfg.sensor.get("images", False):
             process.backup_data(save_dir, cfg, "images")
-            process.process_images(
-                save_dir, cfg.sensor.process_images, cfg.globals)
+            process.process_images(save_dir, cfg.sensor.images, cfg.globals)
 
         if cfg.collect.get("partition", False):
             process.partition_data(save_dir, cfg)

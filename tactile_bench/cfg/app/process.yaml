@@ -12,7 +12,6 @@ collect:
   experiment: ${sensor.name}/${collect.name}
 
 sensor:
-  process_images:
-    visualise_on: true
+  images:
     circle_mask_radius: 150
     binary_threshold: [31, -20] # blocksize, offset
