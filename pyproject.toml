@@ -1,7 +1,7 @@
 [project]
 name = "tactile_bench"
 version = "0.0.1"
-description = "Robot learning suite for tactile robotics"
+description = "Tactile robotics data collection and processing tools"
 readme = "README.md"
 requires-python = "==3.9.*"
 
@@ -12,19 +12,19 @@ authors = [
 
 dependencies = [
     "hydra-core>=1.3.2",
-    "matplotlib",
     "numpy<=1.21.2", # works in 3.8 and 3.9
     "opencv-python>=4.5.1",
     "pandas",
     "pynput",
     "pyyaml>=6.0.2",
-    "scikit-learn",
-    "scikit-image>=0.19.3",
-    "seaborn",
-    "transforms3d",
     "tqdm",
     "common-robot-interface[sim]",
-    "tactile-sim"
+    "tactile-sim", # comment out if no pybullet
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
 ]
 
 [build-system]

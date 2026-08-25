@@ -1,8 +1,14 @@
 name: simtip
-crop: [12, 12, 240, 240]  
+image_size: [256, 256]
+crop: [12, 12, 240, 240]
+capture: pair # final # pair # stream # stream-final
+sample_rate: 30 # Hz
+settle: 0.0
 
-sim: 
+sim:
   sensor_type: standard_tactip
-  image_size: [256, 256]
+  image_size: ${..image_size}
   turn_off_border: false
-  show_tactile: true
+  depth:
+    png: uint8 # uint8 or uint16
+    npz: null # null, float16, or float32

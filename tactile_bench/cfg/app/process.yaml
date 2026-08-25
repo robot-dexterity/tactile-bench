@@ -4,11 +4,11 @@
 defaults:
  - /runtime/base
  - /collect: edge_xRz_mg400
- - /sensor: simtip_dome # tactip_dome127 # 
+ - /sensor: tactip_dome127 
  - _self_
 
 collect:
-  data_dirs: [train, val]    
+  data_dirs: [train, val]
   experiment: ${sensor.name}/${collect.name}
 
 sensor:

@@ -2,15 +2,21 @@ from __future__ import division, print_function, unicode_literals
 
 import numpy as np
 import cv2
-import skimage
-from skimage.util import random_noise
-from scipy import ndimage
 
 
-def apply(image, channel_mode=None, crop=None, dims=None, stdiz=False,
+def normalise_depth(depth):
+    """Convert integer or floating-point depth to float32 in the range [0, 1]."""
+    if np.issubdtype(depth.dtype, np.floating):
+        return np.clip(depth, 0.0, 1.0).astype(np.float32)
+    if np.issubdtype(depth.dtype, np.integer):
+        return depth.astype(np.float32) / np.iinfo(depth.dtype).max
+    raise ValueError(f"unsupported depth dtype: {depth.dtype}")
+
+
+def apply(image, crop=None, dims=None, channel_mode="gray", stdiz=False,
           normlz=False, binary_threshold=None, circle_mask_radius=None,
-          blur_ksize=1, morphology_ksize=1,
-          circle_mask_offset=None, **kwargs):
+          blur_ksize=1, morphology_ksize=1, circle_mask_offset=None, **kwargs
+          ) -> np.ndarray:
     """ Transform image in various ways. """
 
     if channel_mode:
@@ -81,73 +87,11 @@ def apply(image, channel_mode=None, crop=None, dims=None, stdiz=False,
     return image
 
 
-def augment_image(image, rshift=None, rzoom=None, brightlims=None,
-                  noise_var=None, **kwargs):
-    """ Augment image in various ways. """
-
-    if rshift:
-        image = random_shift_image(image, *rshift)
-
-    if rzoom:
-        image = random_zoom_image(image, rzoom)
-
-    if brightlims:
-        image = random_image_brightness(image, brightlims)
-
-    if noise_var:
-        image = random_image_noise(image, noise_var)
-
-    return image
-
-
 def threshold_image(image, block_size=11, offset=-5):
     return cv2.adaptiveThreshold(
         image, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
         block_size, offset
     )
-
-
-def detect_circles(
-    edges,
-    radii=np.arange(3, 10, 1),
-    min_center_dist=None,
-    target_n=1,
-    init_thr_ratio=0.5,
-):
-    hres = skimage.transform.hough_circle(edges, radii)
-    max_acc = np.max(hres)
-    thr_ratio = init_thr_ratio
-
-    if min_center_dist is None:
-        min_center_dist = 2 * radii.min()
-
-    accums, cx, cy, rs = skimage.transform.hough_circle_peaks(
-        hres,
-        radii,
-        total_num_peaks=500,
-        min_xdistance=int(min_center_dist),
-        min_ydistance=int(min_center_dist),
-        threshold=thr_ratio * max_acc,
-        normalize=True,
-    )
-    if len(cx) == 0:
-        return np.array([]), np.array([]), np.array([]), np.array([])
-    if len(cx) >= target_n:
-        order = np.argsort(-accums)[:target_n]
-        return cx[order], cy[order], rs[order], accums[order]
-    return cx, cy, rs, accums
-
-
-def get_circle_mask(image, min_radii, max_radii, scale):
-    sk_frame = skimage.img_as_float(image)
-    edges = skimage.feature.canny(sk_frame, sigma=2.0)
-    outline_radii_range = np.arange(min_radii, max_radii, 1)
-    outline_cx, outline_cy, outline_radii, acc = detect_circles(
-        edges, radii=outline_radii_range, target_n=1, min_center_dist=6
-    )
-    print(
-        f"original outline circle x:{outline_cx} y:{outline_cy} r:{outline_radii}")
-    return (outline_cx[0], outline_cy[0], round(outline_radii[0] * scale))
 
 
 def apply_circle_mask(image, radius=110, circle_mask_offset=(0, 0)):
@@ -158,102 +102,10 @@ def apply_circle_mask(image, radius=110, circle_mask_offset=(0, 0)):
     return cv2.bitwise_and(image, image, mask=mask)
 
 
-def random_image_brightness(image, brightlims):
-    if image.dtype != np.uint8:
-        raise ValueError('Only applies to uint8 images on a 0-255 scale')
-    a1, a2, b1, b2 = brightlims
-    alpha, beta = np.random.uniform(a1, a2), np.random.randint(b1, b2)
-    return np.clip(alpha*image + beta, 0, 255).astype(np.uint8)
-
-
-def random_image_noise(image, noise_var):
-    return (random_noise(image,  var=noise_var) * 255).astype(np.uint8)
-
-
 def per_image_standardisation(image):
     mean = np.mean(image, axis=(0, 1), keepdims=True)
     std = np.sqrt(((image - mean)**2).mean(axis=(0, 1), keepdims=True))
     return (image - mean) / (std+1e-6)
-
-
-def random_shift_image(x, wrg, hrg, fill_mode='nearest', cval=0.):
-    h, w = x.shape[0], x.shape[1]
-    tx, ty = np.random.uniform(-hrg, hrg) * h, np.random.uniform(-wrg, wrg) * w
-    return apply_affine_transform(x, tx=tx, ty=ty, fill_mode=fill_mode, cval=cval)
-
-
-def random_zoom_image(x, zoom_range, fill_mode='nearest', cval=0.):
-    if len(zoom_range) != 2:
-        raise ValueError(
-            '`zoom_range` should be a tuple or list of two floats. Received: %s' % (zoom_range,))
-    zx, zy = (1, 1) if zoom_range[0] == 1 and zoom_range[1] == 1 else np.random.uniform(
-        zoom_range[0], zoom_range[1], 2)
-    return apply_affine_transform(x, zx=zx, zy=zy, fill_mode=fill_mode, cval=cval)
-
-
-def apply_affine_transform(x, theta=0, tx=0, ty=0, zx=1, zy=1, fill_mode='nearest', cval=0.):
-    transform_matrix = None
-    if tx != 0 or ty != 0:
-        shift_matrix = np.array([[1, 0, tx],
-                                 [0, 1, ty],
-                                 [0, 0, 1]])
-        if transform_matrix is None:
-            transform_matrix = shift_matrix
-        else:
-            transform_matrix = np.dot(transform_matrix, shift_matrix)
-
-    if zx != 1 or zy != 1:
-        zoom_matrix = np.array([[zx, 0, 0],
-                                [0, zy, 0],
-                                [0, 0, 1]])
-        if transform_matrix is None:
-            transform_matrix = zoom_matrix
-        else:
-            transform_matrix = np.dot(transform_matrix, zoom_matrix)
-
-    if transform_matrix is not None:
-        h, w = x.shape[0], x.shape[1]
-        transform_matrix = transform_matrix_offset_center(
-            transform_matrix, h, w)
-        x = np.rollaxis(x, 2, 0)
-        final_affine_matrix = transform_matrix[:2, :2]
-        final_offset = transform_matrix[:2, 2]
-
-        channel_images = [ndimage.interpolation.affine_transform(
-            x_channel, final_affine_matrix, final_offset, order=1,
-            mode=fill_mode, cval=cval) for x_channel in x]
-        x = np.stack(channel_images, axis=0)
-    return np.rollaxis(x, 0, 3)
-
-def rotate_image(image, angle_deg):
-    h, w = image.shape[:2]
-    center = (w / 2, h / 2)
-    M = cv2.getRotationMatrix2D(center, angle_deg, 1.0)
-    return cv2.warpAffine(image, M, (h, w))
-
-
-def transform_matrix_offset_center(matrix, x, y):
-    o_x, o_y = float(x) / 2 + 0.5, float(y) / 2 + 0.5
-    offset_matrix = np.array([[1, 0, o_x], [0, 1, o_y], [0, 0, 1]])
-    reset_matrix = np.array([[1, 0, -o_x], [0, 1, -o_y], [0, 0, 1]])
-    return np.dot(np.dot(offset_matrix, matrix), reset_matrix)
-
-
-def bbox_circular_to_triangular(bb):
-    """From (cx, cy, r) to (x0, y0, x1, y1)"""
-    return [bb[0] - bb[2], bb[1] - bb[2], bb[0] + bb[2], bb[1] + bb[2]]
-
-
-def combine_bbox(image_params_1, image_params_2):
-    """Combine bounding boxes from two sets of image parameters."""
-    b1 = image_params_1.get("bbox", [0, 0, 0, 0])
-    b2 = image_params_2.get("bbox", [0, 0, 0, 0])
-
-    # when circular bound box
-    b1 = bbox_circular_to_triangular(b1) if len(b1) == 3 else b1
-    b2 = bbox_circular_to_triangular(b2) if len(b2) == 3 else b2
-
-    return [int(b) for b in [b1[0] + b2[0], b1[1] + b2[1], b1[0] + b2[2], b1[1] + b2[3]]]
 
 
 def camera_loop(camera,
@@ -272,7 +124,7 @@ def camera_loop(camera,
 
 if __name__ == '__main__':
 
-    from tactile_bench.data.utils.sensors import RealSensor
+    from tactile_bench.data.utils.embodiment import RealSensor
 
     sensor_params = {'source': 1}
 

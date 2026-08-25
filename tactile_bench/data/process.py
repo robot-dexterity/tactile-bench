@@ -13,7 +13,6 @@ from shutil import rmtree
 from tqdm import tqdm
 
 from tactile_bench.data.utils import image_transforms
-import shutil
 
 
 def process_images(
@@ -51,8 +50,6 @@ def partition_data(save_dir: str, cfg: DictConfig) -> list[str]:
     """Partition data while including reference rows in every output."""
 
     targets = pd.read_csv(f"{save_dir}/targets.csv")
-    markers = pd.read_csv(f"{save_dir}/markers.zip", compression="zip") \
-                if os.path.isfile(f"{save_dir}/markers.zip") else None
     dirs = [f"{os.path.dirname(save_dir)}/{p}" for p in cfg.collect.partition_dirs]
     ratios = np.asarray(cfg.collect.get("partition_ratios", [1 - 0.2 * (len(dirs) - 1)] 
                                         + [0.2] * (len(dirs) - 1)), float)
@@ -72,19 +69,14 @@ def partition_data(save_dir: str, cfg: DictConfig) -> list[str]:
         setup_save_dir(out_dir, cfg)
         ids = np.sort(np.r_[refs, ids])
         part = targets.iloc[ids].copy()
-        images = part[cfg.globals.IMAGE].copy()
         part[cfg.globals.IMAGE] = f"../{os.path.basename(save_dir)}/" + part[cfg.globals.IMAGE]
         part.to_csv(f"{out_dir}/targets.csv", index=False)
-
-        if markers is not None:
-            markers[markers[cfg.globals.IMAGE].isin(images)].to_csv(
-                f"{out_dir}/markers.zip", index=False, compression={"method": "zip", "archive_name": "markers.csv"})
 
     return dirs
 
 
 def setup_save_dir(save_dir: str, cfg: DictConfig, sub_dirs: list[str] = []) -> None:
-    """Create directory for saving models and parameters."""
+    """Create a dataset directory and write its resolved parameters."""
     
     print(f"Saving to {save_dir}\n Overwrite: {cfg.settings.overwrite_on}")
     if os.path.isdir(save_dir):

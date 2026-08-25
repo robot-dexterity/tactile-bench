@@ -1,5 +1,5 @@
 settings:
-  path: tactile_data
+  path: temp/sim # use tactile_data for retained data
   seed: 42                     # for repeatable random numbers
   overwrite_on: true           # Overwrite existing data
   restore_on: true             # Restore original data from backup before processing

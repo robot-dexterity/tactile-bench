@@ -1,0 +1,6 @@
+name: dummy_robot
+robot: dummy
+
+real:
+  tcp_pose: [0, 0, 0, 0, 0, 0]
+  work_frame: [0, 0, 0, 0, 0, 0]

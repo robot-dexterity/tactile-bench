@@ -1,4 +1,4 @@
-""" Example CL call
+"""Example CLI call:
 uv run python tactile_bench/data/collect.py collect=edge_xRz_mg400 sensor=simtip_dome
 """
 import hydra
@@ -8,13 +8,8 @@ import pandas as pd
 from omegaconf import DictConfig
 from time import sleep
 
-from cri.controller import Controller
-from cri.robot import SyncRobot
-from cri.sim.sim_controller import SimController
-from tactile_sim.pybullet_env import pybullet_env
-
 from tactile_bench.data import process
-from tactile_bench.data.utils.sensors import RealSensor, SimSensor, ReplaySensor
+from tactile_bench.data.utils.embodiment import open_embodiment
 from tactile_bench.data.utils import utils
 
 np.set_printoptions(precision=2, suppress=True)
@@ -54,8 +49,8 @@ def run_collect_loop(
         # move robot, collect data, move back
         robot.move_linear(pose_obj + pose + shear + clearance)
         robot.move_linear(pose_obj + pose + shear)
-        robot.move_linear(pose_obj + pose)
-        sensor.process(image_file)
+        with sensor.capture_images(image_file):
+            robot.move_linear(pose_obj + pose)
         robot.move_linear(pose_obj + pose + clearance)
 
         if not sort_on:
@@ -64,7 +59,6 @@ def run_collect_loop(
     # reset robot
     robot.move_joints(reset_joint_angles[-1])
     robot.move_joints(reset_joint_angles[0])
-    robot.close()
 
 
 def setup_targets(
@@ -90,7 +84,8 @@ def setup_targets(
 
         rows = []
         if globals.get("REFERENCE", None) is not None:
-            rows.append([f"{globals.IMAGE}/{globals.REFERENCE}.png", "reference"])  # empty pose
+            rows.append([f"{globals.IMAGE}/{globals.REFERENCE}.png", 
+                         "reference", *([0.0] * (len(columns) - 2))])
 
         for ind, (obj_label, obj_pose) in enumerate(object_poses.items()):
             poses = sample_poses(
@@ -131,37 +126,16 @@ def sample_poses(
     return np.array(samples).T + poses_mid
 
 
-def setup_embodiment(cfg: DictConfig) -> tuple[SyncRobot, object]:
-    """Create and configure the robot and tactile sensor."""
-    if cfg.sensor.get("sim", None):
-        env = pybullet_env(**{**cfg.collect.sim, **cfg.sensor.sim})
-        robot = SyncRobot(SimController(env.arm))
-        robot.coord_frame = cfg.collect.sim.work_frame
-        robot.tcp = cfg.collect.sim.tcp_pose
-        sensor = SimSensor(cfg.sensor.sim, env)
-    else:
-        robot = SyncRobot(Controller[cfg.collect.robot]())
-        robot.coord_frame = cfg.collect.real.work_frame
-        robot.tcp = cfg.collect.real.tcp_pose
-        robot.speed = cfg.collect.real.get("speed", 10)
-        sensor = RealSensor(cfg.sensor)
-    if cfg.sensor.get("replay", None):
-        sensor = ReplaySensor(cfg.sensor)
-
-    robot.name, sensor.name = cfg.collect.robot, cfg.sensor.name
-    return robot, sensor
-
-
 def collect_data(save_dir: str, sample_num: int, cfg: DictConfig) -> None:
     """ Collect data for the requested robot/sensor, save data in specified directory. """
 
     np.random.seed(cfg.settings.get('seed', None))
     
     process.setup_save_dir(save_dir, cfg, sub_dirs=cfg.globals.IMAGE)
-    robot, sensor = setup_embodiment(cfg)
     targets_df = setup_targets(sample_num, cfg.collect, cfg.globals, save_dir)
-    run_collect_loop(robot, sensor, targets_df, save_dir, cfg.globals, 
-                     cfg.collect.get("sort_on", False))
+    with open_embodiment(cfg) as (robot, sensor):
+        run_collect_loop(robot, sensor, targets_df, save_dir, cfg.globals,
+                         cfg.collect.get("sort_on", False))
 
 
 cfg_path, cfg_name = "../cfg", "app/collect"
@@ -170,10 +144,10 @@ cfg_path, cfg_name = "../cfg", "app/collect"
 def main(cfg: DictConfig):
     """ For each pair [data_dirs, num_samples], collect data and save in dirs set in config or CLI """
 
-    if len(cfg.collect.sample_nums) != len(cfg.collect.data_dirs):
-        raise ValueError(f"sample_nums and data_dirs must be same length")
+    if len(cfg.collect.num_samples) != len(cfg.collect.data_dirs):
+        raise ValueError("num_samples and data_dirs must be same length")
 
-    for dir, sample_num in zip(cfg.collect.data_dirs, cfg.collect.sample_nums):
+    for dir, sample_num in zip(cfg.collect.data_dirs, cfg.collect.num_samples):
         save_dir = f"{cfg.settings.path}/{cfg.collect.experiment}/{dir}"
         collect_data(save_dir, sample_num, cfg)
 

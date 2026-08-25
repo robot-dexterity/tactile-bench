@@ -4,8 +4,6 @@ exposure: -7
 greyscale_on: true
 crop: [320, 265, 180]
 
-markers:
-  num_markers: 127
-  num_rings: 7
-  pattern: hexagonal
-  backbone_offset_deg: 30
+real:
+  tcp_pose: [0, 0, 0, 0, 0, 0] #[0, 0, 92.4, 0, 0, 0]   # == domeTT (same physical sensor)
+  max_press_depth: 5.0
