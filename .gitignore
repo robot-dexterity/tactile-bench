@@ -1,0 +1,18 @@
+*.egg-info
+*.pyo
+*.pyc
+.agents
+.idea
+.vscode
+__pycache__/
+requirements.txt
+saved_models
+temp/
+outputs/
+tensorboard_runs/
+
+# uv
+uv.lock
+!pyproject.toml
+.venv/
+.uv*

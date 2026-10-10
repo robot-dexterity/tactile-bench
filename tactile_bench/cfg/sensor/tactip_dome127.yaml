@@ -1,0 +1,7 @@
+name: tactip
+source: 1
+exposure: -7
+crop: [320, 265, 180]
+
+real:
+  tcp_pose: [0, 0, 0, 0, 0, 0] #[0, 0, 92.4, 0, 0, 0]   # == domeTT (same physical sensor)

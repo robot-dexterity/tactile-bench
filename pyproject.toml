@@ -1,0 +1,31 @@
+[project]
+name = "tactile-bench"
+version = "0.1"
+description = "Tactile robotics data collection and processing tools"
+readme = "README.md"
+requires-python = "==3.9.*"
+
+license = { text = "GPL-3.0-or-later" }
+authors = [
+  { name = "Nathan Lepora, Yijiong Lin, Harry Field, Bowen Deng, Richard Lane", email = "n.lepora@bristol.ac.uk" },
+]
+
+dependencies = [
+    "hydra-core>=1.3.2",
+    "numpy<=1.21.2", # works in 3.8 and 3.9
+    "opencv-python>=4.5.1",
+    "pandas",
+    "pynput",
+    "pyyaml>=6.0.2",
+    "tqdm",
+    "common-robot-interface[sim]",
+    "tactile-sim", # comment out if no pybullet
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+common-robot-interface = { path = "../common-robot-interface", editable = true }
+tactile-sim = { path = "../tactile-sim", editable = true }

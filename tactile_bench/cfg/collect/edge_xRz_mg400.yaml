@@ -1,0 +1,16 @@
+name: edge_xRz
+robot: mg400
+stim_name: square
+pose_lims: [[5, 0, 3, 0, 0, -45], [-5, 0, 5, 0, 0, 45]]
+shear_lims: [[-5, -5, 0, 0, 0, -5], [5, 5, 0, 0, 0, 5]]
+sort_on: true 
+
+real:
+  tcp_pose: [0, 0, -50, 0, 0, 0] 
+  work_frame: [280, 0, -168, -180, 0, 0]
+sim:
+  tcp_pose: [0, 0, -85, 0, 0, 0] 
+  work_frame: [280, 0, 50, -180, 0, 0]
+  arm_type: ${..robot}
+  stim_name: ${..stim_name}
+  stim_pose: [330, 0, 12.5, 0, 0, 0] 

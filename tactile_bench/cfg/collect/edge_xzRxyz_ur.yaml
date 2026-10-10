@@ -1,0 +1,19 @@
+name: edge_xzRxyz
+robot: ur
+stim_name: square
+pose_lims: [[-5, 0, 1, -20, -20, -180], [5, 0, 5, 20, 20, 180]]
+shear_lims: [[-5, -5, 0, -5, -5, -5], [5, 5, 0, 5, 5, 5]]
+object_poses: 
+  edge: [0, 0, 0, 0, 0, 0]
+sort_on: true
+
+real:
+  tcp_pose: [0, 0, 101.0, 0, 0, 0]
+  work_frame: [0, -451.0, 54.0, -180, 0, 0]
+  speed: 50
+sim:
+  tcp_pose: [0, 0, -85, 0, 0, 0]
+  work_frame: [650, 0, 52.5, -180, 0, 0]
+  arm_type: ${..robot}
+  stim_name: ${..stim_name}
+  stim_pose: [600, 0, 12.5, 0, 0, 0] 

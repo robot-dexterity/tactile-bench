@@ -1,0 +1,17 @@
+# @package _global_
+# Runtime options for the process script
+
+defaults:
+ - /runtime/base
+ - /collect: edge_xRz_mg400
+ - /sensor: tactip_dome127 
+ - _self_
+
+collect:
+  data_dirs: [train, val]
+  experiment: ${sensor.name}/${collect.name}
+
+sensor:
+  images:
+    circle_mask_radius: 150
+    binary_threshold: [31, -20] # blocksize, offset

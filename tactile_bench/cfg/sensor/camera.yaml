@@ -1,0 +1,8 @@
+name: camera
+source: 0
+exposure: -7
+crop: null
+settle: 0.1
+
+real:
+  tcp_pose: [0, 0, 0, 0, 0, 0]

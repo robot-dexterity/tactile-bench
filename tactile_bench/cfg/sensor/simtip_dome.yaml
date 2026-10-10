@@ -1,0 +1,12 @@
+name: simtip
+image_size: [256, 256]
+crop: [12, 12, 240, 240]
+settle: 0.0
+
+sim:
+  sensor_type: standard_tactip
+  image_size: ${..image_size}
+  turn_off_border: false
+  depth:
+    png: uint8 # uint8 or uint16
+    npz: null # null, float16, or float32

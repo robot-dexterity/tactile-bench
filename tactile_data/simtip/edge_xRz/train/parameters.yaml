@@ -1,0 +1,39 @@
+collect:
+  data_dirs: [train, val]
+  name: edge_xRz
+  pose_lims:
+  - [5, 0, 3, 0, 0, -45]
+  - [-5, 0, 5, 0, 0, 45]
+  real:
+    tcp_pose: [0, 0, -50, 0, 0, 0]
+    work_frame: [280, 0, -170, -180, 0, 0]
+  sample_nums: [4001, 1001]
+  shear_lims:
+  - [-5, -5, 0, 0, 0, -5]
+  - [5, 5, 0, 0, 0, 5]
+  sim:
+    arm_type: mg400
+    stim_name: square
+    stim_pose: [330, 0, 12.5, 0, 0, 0]
+    tcp_pose: [0, 0, -85, 0, 0, 0]
+    work_frame: [280, 0, 50, -180, 0, 0]
+  sort_on: true
+  transfer: tactile_data/mg400_tactip/edge_xRz
+globals:
+  IMAGE: tactile_images
+  OBJECT_CLASS: class
+  OBJECT_POSE: [object_x, object_y, object_z, object_Rx, object_Ry, object_Rz]
+  POSE: [pose_x, pose_y, pose_z, pose_Rx, pose_Ry, pose_Rz]
+  REFERENCE: 0
+  SHEAR: [shear_x, shear_y, shear_z, shear_Rx, shear_Ry, shear_Rz]
+robot: {name: mg400}
+sensor:
+  crop: [12, 12, 240, 240]
+  name: simtip
+  sim:
+    image_size: [256, 256]
+    sensor_type: standard_tactip
+    show_tactile: false
+    turn_off_border: false
+settings: {device: cpu, overwrite_on: true, path: tactile_data, restore_on: true,
+  seed: 42, temp_on: false}
