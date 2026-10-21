@@ -1,0 +1,18 @@
+# @package _global_
+# Runtime options for data/collect.py
+
+defaults:
+  - /runtime/base
+  - _self_  # Before the collect config, which may set its own num_samples and data_dirs.
+  - /backend: sim  # or real
+  - /collect: mixed_xy_mg400
+  - /sensor: simtip_dome  # or tactip_dome127
+
+collect:
+  experiment: ${collect.robot}/${sensor.name}/${collect.name}
+
+  # Defaults, overwritten by the collect config:
+  data_dirs: [train, val]
+  num_samples: [100, 20]
+  # transfer: the targets of an earlier collection, tactile_data/<robot>/<sensor>/<dataset>, to copy
+  transfer: null

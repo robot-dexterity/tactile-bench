@@ -1,0 +1,35 @@
+name: mixed_xy
+robot: mg400
+stim_name: mixed_probes
+pose_lims: [[-5, -5, -1, 0, 0, 0], [5, 5, 1, 0, 0, 0]]
+num_samples: [100, 20]  # Per probe, for the data_dirs train and val.
+object_poses:
+  cone:           [-25, -75, 0, 0, 0, 0]
+  cross_lines:    [-25, -50, 0, 0, 0, 0]
+  curved_surface: [-25, -25, 0, 0, 0, 0]
+  cylinder:       [-25, 0, 0, 0, 0, 0]
+  cylinder_shell: [-25, 25, 0, 0, 0, 0]
+  cylinder_side:  [-25, 50, 0, 0, 0, 0]
+  dot_in:         [-25, 75, 0, 0, 0, 0]
+  dots:           [0, -75, 0, 0, 0, 0]
+  flat_slab:      [0, -50, 0, 0, 0, 0]
+  hexagon:        [0, -25, 0, 0, 0, 0]
+  line:           [0, 0, 0, 0, 0, 0]
+  moon:           [0, 25, 0, 0, 0, 0]
+  pacman:         [0, 50, 0, 0, 0, 0]
+  parallel_lines: [0, 75, 0, 0, 0, 0]
+  prism:          [25, -75, 0, 0, 0, 0]
+  random:         [25, -50, 0, 0, 0, 0]
+  sphere1:        [25, -25, 0, 0, 0, 0]
+  sphere2:        [25, 0, 0, 0, 0, 0]
+  torus:          [25, 25, 0, 0, 0, 0]
+  triangle:       [25, 50, 0, 0, 0, 0]
+  wave:           [25, 75, 0, 0, 0, 0]
+
+# No real block yet: the real MG400's frames for the mixed probes are not set up.
+sim:
+  tcp_pose: [0, 0, -85, 0, 0, 0]
+  work_frame: [300, 0, 25, -180, 0, -180]  # The probes within the MG400's reach.
+  arm_type: ${..robot}
+  stim_name: ${..stim_name}
+  stim_pose: [300, 0, 12.5, 0, 0, 0]

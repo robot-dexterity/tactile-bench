@@ -1,0 +1,8 @@
+name: sim
+
+env:
+  show_gui: true
+  embodiment_type: tactile_arm
+  show_tactile: true
+  physics_rate: 240 # Hz
+  solver_iterations: 300

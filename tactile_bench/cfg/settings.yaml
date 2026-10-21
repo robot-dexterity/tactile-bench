@@ -1,0 +1,13 @@
+settings:
+  path: temp # use tactile_data for retained data
+  seed: 42                     # for repeatable random numbers
+  overwrite_on: true           # Overwrite existing data
+  restore_on: true             # Restore original data from backup before processing
+  device: cpu                  # Device to use: cpu or cuda
+
+globals:
+  IMAGE: tactile_images
+  OBJECT_CLASS: class
+  OBJECT_POSE: [object_x, object_y, object_z, object_Rx, object_Ry, object_Rz]
+  POSE: [pose_x, pose_y, pose_z, pose_Rx, pose_Ry, pose_Rz]
+  REFERENCE: 0       

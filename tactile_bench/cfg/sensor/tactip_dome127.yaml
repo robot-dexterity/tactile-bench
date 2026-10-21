@@ -1,0 +1,14 @@
+# The Dome TacTip with 127 markers, set for the MG400 rig; other rigs override under collect.real.
+name: tactip
+source: 1
+exposure: -7
+crop: [320, 265, 180]
+
+real:
+  tcp_pose: [0, 0, 0, 0, 0, 0]  # each rig's collect config sets its mount
+
+# Thresholds the collected frames into marker images, backing up the raw ones.
+images:
+  circle_mask_radius: 150
+  binary_threshold: [31, -20]  # blocksize, offset
+  visualise_on: false
